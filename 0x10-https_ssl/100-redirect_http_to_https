@@ -1,41 +1,44 @@
 global
-    log     /dev/log local0
-    maxconn 2048
-    user    haproxy
-    group   haproxy
-    tune.ssl.default-dh-param 2048
+    log /dev/log local0
+    log /dev/log  local1 notice
+    chroot /var/lib/haproxy
+    stats socket /run/haproxy/admin.sock mode 660 level admin expose-fd listeners
+    stats timeout 30s
+    user haproxy
+    group haproxy
+    daemon
+
+    # Default SSL material locations
+    ca-base /etc/ssl/certs
+    crt-base /etc/ssl/private
 
 defaults
     log     global
     mode    http
     option  httplog
     option  dontlognull
-    retries 3
-    option  redispatch
+    option redispatch
     timeout connect  5000
-    timeout client  10000
-    timeout server  10000
-    option  forwardfor
-    option  http-server-close
+    timeout client  50000
+    timeout server  50000
+    option forwardfor
+    option http-server-close
+    errorfile 400 /etc/haproxy/errors/400.http
+    errorfile 403 /etc/haproxy/errors/403.http
+    errorfile 408 /etc/haproxy/errors/408.http
+    errorfile 500 /etc/haproxy/errors/500.http
+    errorfile 502 /etc/haproxy/errors/502.http
+    errorfile 503 /etc/haproxy/errors/503.http
+    errorfile 504 /etc/haproxy/errors/504.http
+    
+frontend http_front 
+    bind *:80
+    bind *:443 ssl crt /etc/letsencrypt/live/www.ademolaayinde.tech/ademolaayinde.tech.pem
+    http-request add-header X-Forwarded-Proto http
+    http-request redirect scheme https if !{ ssl_fc }
+    default_backend http-back
 
-frontend www-http
-    bind   0.0.0.0:80
-    reqadd X-Forwarded-Proto:\ http
-    default_backend www-backend
-    redirect scheme https code 301 if !{ ssl_fc }
-
-frontend www-https
-    bind   0.0.0.0:443 ssl crt /etc/haproxy/certs/www.bdbnb.site.pem
-    reqadd X-Forwarded-Proto:\ https
-    acl    letsencrypt-acl path_beg /.well-known/acme-challenge/
-    use_backend letsencrypt-backend if letsencrypt-acl
-    default_backend www-backend
-
-backend www-backend
-    balance  roundrobin
+backend http-back
     redirect scheme https if !{ ssl_fc }
-        server 295108-web-01 54.90.1.78:80 check
-        server 295108-web-02 52.86.227.156:80 check
-
-backend letsencrypt-backend
-    server letsencrypt 127.0.0.1:54321
+    server 295108-web-01 54.157.163.217:80
+    server 295108-web-02 34.229.67.91:80
